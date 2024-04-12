@@ -1,0 +1,1269 @@
+type: edu
+files:
+  - name: src/resources/application.properties
+    visible: true
+    text: |
+      server.port=8889
+      management.endpoints.web.exposure.include=*
+      management.endpoint.shutdown.enabled=true
+    learner_created: false
+  - name: build.gradle
+    visible: true
+    text: |
+      import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+      
+      buildscript {
+          repositories {
+              google()
+              jcenter()
+          }
+          dependencies {
+              classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$hs.kotlin.version"
+              classpath "org.springframework.boot:spring-boot-gradle-plugin:$hs.spring.bootVersion"
+              classpath "io.spring.gradle:dependency-management-plugin:$hs.spring.dependencyManagementVersion"
+              classpath "org.jetbrains.kotlin:kotlin-allopen:$hs.kotlin.version"
+              classpath "org.jetbrains.kotlin:kotlin-noarg:$hs.kotlin.version"
+          }
+      }
+      
+      apply plugin: 'java'
+      apply plugin: 'kotlin'
+      apply plugin: 'org.springframework.boot'
+      apply plugin: 'io.spring.dependency-management'
+      apply plugin: "kotlin-spring"
+      apply plugin: "kotlin-jpa"
+      
+      repositories {
+          mavenCentral()
+      }
+      
+      sourceSets.main.resources.srcDirs = ["src/resources"]
+      
+      dependencies {
+          implementation 'org.springframework.boot:spring-boot-starter'
+          implementation 'org.springframework.boot:spring-boot-starter-actuator'
+          implementation 'org.springframework.boot:spring-boot-starter-web'
+          implementation 'com.fasterxml.jackson.module:jackson-module-kotlin'
+          implementation 'org.jetbrains.kotlin:kotlin-reflect'
+      }
+      
+      tasks.withType(KotlinCompile) {
+          kotlinOptions {
+              freeCompilerArgs = ['-Xjsr305=strict']
+              jvmTarget = "$hs.kotlin.javaVersion"
+          }
+      }
+    learner_created: false
+  - name: src/engine/WebQuizEngine.kt
+    visible: true
+    text: |
+      package engine
+      
+      import org.springframework.boot.autoconfigure.SpringBootApplication
+      import org.springframework.boot.runApplication
+      
+      @SpringBootApplication
+      class WebQuizEngine
+      
+      fun main(args: Array<String>) {
+          runApplication<WebQuizEngine>(*args)
+      }
+    learner_created: false
+  - name: test/WebQuizEngineTest.java
+    visible: false
+    text: |
+      import com.google.gson.JsonElement;
+      import com.google.gson.JsonObject;
+      import org.hyperskill.hstest.dynamic.input.DynamicTesting;
+      import org.hyperskill.hstest.dynamic.input.DynamicTestingMethod;
+      import org.hyperskill.hstest.exception.outcomes.UnexpectedError;
+      import org.hyperskill.hstest.exception.outcomes.WrongAnswer;
+      import org.hyperskill.hstest.mocks.web.request.HttpRequest;
+      import org.hyperskill.hstest.mocks.web.response.HttpResponse;
+      import org.hyperskill.hstest.stage.SpringTest;
+      import org.hyperskill.hstest.testcase.CheckResult;
+      
+      import static org.hyperskill.hstest.common.JsonUtils.getJson;
+      import static org.hyperskill.hstest.common.JsonUtils.getPrettyJson;
+      import static org.hyperskill.hstest.testing.expect.Expectation.expect;
+      import static org.hyperskill.hstest.testing.expect.json.JsonChecker.any;
+      import static org.hyperskill.hstest.testing.expect.json.JsonChecker.isArray;
+      import static org.hyperskill.hstest.testing.expect.json.JsonChecker.isInteger;
+      import static org.hyperskill.hstest.testing.expect.json.JsonChecker.isObject;
+      import static org.hyperskill.hstest.testing.expect.json.JsonChecker.isString;
+      
+      public class WebQuizEngineTest extends SpringTest {
+          public WebQuizEngineTest() {
+              super("../quizdb.mv.db");
+          }
+      
+          static void checkStatusCode(HttpResponse resp, int status) {
+              if (resp.getStatusCode() != status) {
+                  throw new WrongAnswer(
+                      resp.getRequest().getMethod() + " " +
+                          resp.getRequest().getLocalUri() +
+                          " should respond with status code " + status + ", " +
+                          "responded: " + resp.getStatusCode() + "\n\n" +
+                          "Response body:\n\n" + resp.getContent()
+                  );
+              }
+          }
+      
+          private static String quiz1 =
+              "{\n" +
+                  "  \"title\": \"The Java Logo\", \n" +
+                  "  \"text\": \"What is depicted on the Java logo?\",\n" +
+                  "  \"options\": [\"Robot\",\"Tea leaf\",\"Cup of coffee\",\"Bug\"],\n" +
+                  "  \"answer\": [2]\n" +
+                  "}";
+      
+          private static String quiz2 =
+              "{\n" +
+                  "  \"title\": \"The Ultimate Question\",\n" +
+                  "  \"text\": \"What is the answer to the Ultimate Question of Life, the Universe and Everything?\",\n" +
+                  "  \"options\": [\"Everything goes right\",\"42\",\"2+2=4\",\"11011100\"],\n" +
+                  "  \"answer\": [1]\n" +
+                  "}";
+      
+          private static String quiz3 =
+              "{\n" +
+                  "  \"title\": \"Math1\",\n" +
+                  "  \"text\": \"Which of the following is equal to 4?\",\n" +
+                  "  \"options\": [\"1+3\",\"2+2\",\"8-1\",\"1+5\"],\n" +
+                  "  \"answer\": [0,1]\n" +
+                  "}";
+      
+          private static String quiz4 =
+              "{\n" +
+                  "  \"title\": \"Math2\",\n" +
+                  "  \"text\": \"Which of the following is equal to 4?\",\n" +
+                  "  \"options\": [\"1+1\",\"2+2\",\"8-1\",\"5-1\"],\n" +
+                  "  \"answer\": [1,3]\n" +
+                  "}";
+      
+          private static String quiz5 =
+              "{\n" +
+                  "  \"title\": \"Math3\",\n" +
+                  "  \"text\": \"Which of the following is equal to 4?\",\n" +
+                  "  \"options\": [\"2*3\",\"5*8\",\"8*0\",\"1*5\"],\n" +
+                  "  \"answer\": []\n" +
+                  "}";
+      
+          private static String quiz6 =
+              "{\n" +
+                  "  \"title\": \"Math4\",\n" +
+                  "  \"text\": \"Which of the following is equal to 4?\",\n" +
+                  "  \"options\": [\"2*3\",\"5*8\",\"8*0\",\"1*5\"]\n" +
+                  "}";
+      
+          private static String quiz7 =
+              "{\n" +
+                  "  \"title\": \"Math5\",\n" +
+                  "  \"text\": \"Which of the following is equal to 4?\",\n" +
+                  "  \"options\": [\"2^2\",\"2+2\",\"2-2\",\"2*2\"],\n" +
+                  "  \"answer\": [0,1,3]\n" +
+                  "}";
+      
+          private static String[] quizzes = new String[] {
+              quiz1, quiz2, quiz3, quiz4, quiz5, quiz6, quiz7
+          };
+      
+          private static int[] quizIds = new int[] {
+              0, 0, 0, 0, 0, 0, 0
+          };
+      
+          private static String error400noTitle =
+              "{\n" +
+                  "  \"text\": \"What is the answer to the Ultimate Question of Life, the Universe and Everything?\",\n" +
+                  "  \"options\": [\"Everything goes right\",\"42\",\"2+2=4\",\"11011100\"]\n" +
+                  "  \"answer\": [1]\n" +
+                  "}";
+      
+          private static String error400emptyTitle =
+              "{\n" +
+                  "  \"title\": \"\",\n" +
+                  "  \"text\": \"What is the answer to the Ultimate Question of Life, the Universe and Everything?\",\n" +
+                  "  \"options\": [\"Everything goes right\",\"42\",\"2+2=4\",\"11011100\"]\n" +
+                  "  \"answer\": [1]\n" +
+                  "}";
+      
+          private static String error400noText =
+              "{\n" +
+                  "  \"title\": \"123123123\",\n" +
+                  "  \"options\": [\"Everything goes right\",\"42\",\"2+2=4\",\"11011100\"]\n" +
+                  "  \"answer\": [1]\n" +
+                  "}";
+      
+          private static String error400emptyText =
+              "{\n" +
+                  "  \"title\": \"The Ultimate Question\",\n" +
+                  "  \"text\": \"\",\n" +
+                  "  \"options\": [\"Everything goes right\",\"42\",\"2+2=4\",\"11011100\"]\n" +
+                  "  \"answer\": [1]\n" +
+                  "}";
+      
+          private static String error400noOptions =
+              "{\n" +
+                  "  \"title\": \"The Ultimate Question\",\n" +
+                  "  \"text\": \"123123123\",\n" +
+                  "  \"answer\": [1]\n" +
+                  "}";
+      
+          private static String error400emptyOptions =
+              "{\n" +
+                  "  \"title\": \"The Ultimate Question\",\n" +
+                  "  \"text\": \"What is the answer to the Ultimate Question of Life, the Universe and Everything?\",\n" +
+                  "  \"options\": [ ]\n" +
+                  "  \"answer\": [ ]\n" +
+                  "}";
+      
+          private static String error400oneOption =
+              "{\n" +
+                  "  \"title\": \"The Ultimate Question\",\n" +
+                  "  \"text\": \"What is the answer to the Ultimate Question of Life, the Universe and Everything?\",\n" +
+                  "  \"options\": [\"Everything goes right\"]\n" +
+                  "  \"answer\": [0]\n" +
+                  "}";
+      
+      
+          private static String login1 = "test@google.com";
+          private static String pass1 = "qwerty";
+      
+          private static String login2 = "user@google.com";
+          private static String pass2 = "12345";
+      
+          private static HttpRequest auth(HttpRequest req, int user) {
+              String login;
+              String pass;
+              if (user == 1) {
+                  login = login1;
+                  pass = pass1;
+              } else if (user == 2) {
+                  login = login2;
+                  pass = pass2;
+              } else {
+                  login = fakeLogin;
+                  pass = fakePass;
+              }
+              return req.basicAuth(login, pass);
+          }
+      
+          private static String fakeLogin = "qwerty@google.com";
+          private static String fakePass = "456534";
+      
+          private static String noAtInLogin_login = "google.com";
+          private static String noAtInLogin_pass = "asddfggh";
+      
+          private static String noDotInLogin_login = "well@googlecom";
+          private static String noDotInLogin_pass = "rtyfgcxsfd";
+      
+          private static String loginExist_login = "test@google.com";
+          private static String loginExist_pass = "rtyfgcxsfd1";
+      
+          private static String shortPassword_login = "someuser@gmail.com";
+          private static String shortPassword_pass = "1234";
+      
+          private static String shortPassword2_login = "someuser2@gmail.com";
+          private static String shortPassword2_pass = "123";
+      
+          @DynamicTestingMethod
+          DynamicTesting[] dt = new DynamicTesting[] {
+              // Test login
+              () -> testRegister(login1, pass1, 200),
+              () -> testRegister(login2, pass2, 200),
+              () -> testRegister(noAtInLogin_login, noAtInLogin_pass, 400),
+              () -> testRegister(noDotInLogin_login, noDotInLogin_pass, 400),
+              () -> testRegister(loginExist_login, loginExist_pass, 400),
+              () -> testRegister(shortPassword_login, shortPassword_pass, 400),
+              () -> testRegister(shortPassword2_login, shortPassword2_pass, 400),
+      
+      
+              // Add 2 quizzes and check their existence
+              () -> testAllQuizzes(0, 0,1),
+              () -> testAllQuizzes(0, 0,2),
+      
+              () -> testCreateQuiz(0, 1),
+              () -> testQuizExists(0, 2),
+              () -> testQuizNotExists(0, 2, 125),
+      
+              () -> testAllQuizzes(1, 0,1),
+      
+              () -> testCreateQuiz(1, 2),
+              () -> testQuizExists(1, 2),
+              () -> testQuizNotExists(1, 2, 125),
+      
+              () -> testAllQuizzes(2, 0,2),
+      
+      
+              // No auth operations tests
+              () -> testAllQuizzesNoAuth(),
+              () -> testCreateQuizNoAuth(1),
+              () -> testCreateQuizNoAuth(2),
+              () -> testSolveQuizNoAuth(quizIds[0], "[0]"),
+              () -> testSolveQuizNoAuth(quizIds[1], "[1]"),
+              () -> testDeleteQuizzesNoAuth(quizIds[0]),
+              () -> testDeleteQuizzesNoAuth(quizIds[1]),
+              () -> testCompletedQuizzesNoAuth(),
+      
+      
+              // Fake auth operations tests
+              () -> testAllQuizzesFakeAuth(),
+              () -> testCreateQuizFakeAuth(1),
+              () -> testCreateQuizFakeAuth(2),
+              () -> testSolveQuizFakeAuth(quizIds[0], "[0]"),
+              () -> testSolveQuizFakeAuth(quizIds[1], "[1]"),
+              () -> testDeleteQuizzesFakeAuth(quizIds[0]),
+              () -> testDeleteQuizzesFakeAuth(quizIds[1]),
+              () -> testCompletedQuizzesFakeAuth(),
+      
+      
+              // Solve two quizzes
+              () -> checkQuizSuccess(quizIds[0], "[0]", false, 1),
+              () -> checkQuizSuccess(quizIds[0], "[1]", false, 2),
+              () -> checkQuizSuccess(quizIds[0], "[2]", true, 1),
+              () -> checkQuizSuccess(quizIds[0], "[3]", false, 2),
+      
+              () -> checkQuizSuccess(quizIds[1], "[0]", false, 1),
+              () -> checkQuizSuccess(quizIds[1], "[1]", true, 2),
+              () -> checkQuizSuccess(quizIds[1], "[2]", false, 1),
+              () -> checkQuizSuccess(quizIds[1], "[3]", false, 2),
+      
+      
+              // Check completed
+              () -> testCompletedQuizzes(1, 1, 0 ,0, quizIds[0]),
+              () -> testCompletedQuizzes(1, 2, 0, 0, quizIds[1]),
+      
+      
+              // Test database save
+              () -> testAllQuizzes(2, 0, 1),
+              () -> testAllQuizzes(2, 0,2),
+              () -> reloadServer(),
+              () -> testAllQuizzes(2, 0,1),
+              () -> testAllQuizzes(2, 0,2),
+              () -> checkQuizSuccess(quizIds[0], "[2]", true, 2),
+              () -> checkQuizSuccess(quizIds[0], "[3]", false, 1),
+              () -> checkQuizSuccess(quizIds[1], "[0]", false, 2),
+              () -> checkQuizSuccess(quizIds[1], "[1]", true, 1),
+      
+      
+              // Check completed
+              () -> testCompletedQuizzes(2, 1, 0 ,1, quizIds[0]),
+              () -> testCompletedQuizzes(2, 1, 0 ,0, quizIds[1]),
+      
+              () -> testCompletedQuizzes(2, 2, 0, 1, quizIds[1]),
+              () -> testCompletedQuizzes(2, 2, 0, 0, quizIds[0]),
+      
+      
+              // Test wrongly created quizzes
+              () -> addIncorrectQuiz(error400noTitle, 1),
+              () -> addIncorrectQuiz(error400emptyTitle, 2),
+              () -> addIncorrectQuiz(error400noText, 1),
+              () -> addIncorrectQuiz(error400emptyText, 2),
+              () -> addIncorrectQuiz(error400noOptions, 1),
+              () -> addIncorrectQuiz(error400emptyOptions, 2),
+              () -> addIncorrectQuiz(error400oneOption, 1),
+      
+      
+              // Test multiple answers
+              () -> testCreateQuiz(2, 1),
+              () -> testQuizExists(2, 1),
+              () -> testQuizNotExists(2, 1, 125),
+              () -> checkQuizSuccess(quizIds[2], "[]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[0]", false, 2),
+              () -> checkQuizSuccess(quizIds[2], "[1]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[2]", false, 2),
+              () -> checkQuizSuccess(quizIds[2], "[3]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[0,1]", true, 2),
+              () -> checkQuizSuccess(quizIds[2], "[0,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[0,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[2], "[1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[1,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[2], "[2,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[0,1,2]", false, 2),
+              () -> checkQuizSuccess(quizIds[2], "[0,1,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[2], "[1,2,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[2], "[0,1,2,3]", false, 1),
+      
+              () -> testCreateQuiz(3, 1),
+              () -> testQuizExists(3, 1),
+              () -> testQuizNotExists(3, 1, 125),
+              () -> checkQuizSuccess(quizIds[3], "[]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[0]", false, 2),
+              () -> checkQuizSuccess(quizIds[3], "[1]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[2]", false, 2),
+              () -> checkQuizSuccess(quizIds[3], "[3]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[0,1]", false, 2),
+              () -> checkQuizSuccess(quizIds[3], "[0,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[0,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[3], "[1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[3], "[2,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[0,1,2]", false, 2),
+              () -> checkQuizSuccess(quizIds[3], "[0,1,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[3], "[1,2,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[3], "[0,1,2,3]", false, 1),
+      
+              () -> testCreateQuiz(4, 1),
+              () -> testQuizExists(4, 1),
+              () -> testQuizNotExists(4, 1, 125),
+              () -> checkQuizSuccess(quizIds[4], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[4], "[0]", false, 2),
+              () -> checkQuizSuccess(quizIds[4], "[1]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[2]", false, 2),
+              () -> checkQuizSuccess(quizIds[4], "[3]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[0,1]", false, 2),
+              () -> checkQuizSuccess(quizIds[4], "[0,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[0,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[4], "[1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[1,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[4], "[2,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[0,1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[0,1,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[4], "[1,2,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[4], "[0,1,2,3]", false, 2),
+      
+              () -> testCreateQuiz(5, 1),
+              () -> testQuizExists(5, 1),
+              () -> testQuizNotExists(5, 1, 125),
+              () -> checkQuizSuccess(quizIds[5], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[1]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[2]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[3]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0,1]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[1,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[2,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0,1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0,1,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[1,2,3]", false, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0,1,2,3]", false, 1),
+      
+              () -> testCreateQuiz(6, 1),
+              () -> testQuizExists(6, 1),
+              () -> testQuizNotExists(6, 1, 125),
+              () -> checkQuizSuccess(quizIds[6], "[]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[1]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[2]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[3]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,1]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,2]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[1,2]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[1,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[2,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,1,2]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[6], "[1,2,3]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,1,2,3]", false, 2),
+      
+              () -> testAllQuizzes(7, 0,2),
+              () -> reloadServer(),
+              () -> testAllQuizzes(7, 0,2),
+              () -> checkQuizSuccess(quizIds[5], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[5], "[0]", false, 2),
+              () -> checkQuizSuccess(quizIds[6], "[0,1,2]", false, 1),
+              () -> checkQuizSuccess(quizIds[6], "[0,1,3]", true, 2),
+      
+      
+              // Check completed
+              () -> testCompletedQuizzes(5, 1, 0 ,4, quizIds[0]),
+              () -> testCompletedQuizzes(5, 1, 0 ,3, quizIds[1]),
+              () -> testCompletedQuizzes(5, 1, 0 ,2, quizIds[4]),
+              () -> testCompletedQuizzes(5, 1, 0 ,1, quizIds[5]),
+              () -> testCompletedQuizzes(5, 1, 0 ,0, quizIds[5]),
+      
+              () -> testCompletedQuizzes(6, 2, 0, 5, quizIds[1]),
+              () -> testCompletedQuizzes(6, 2, 0, 4, quizIds[0]),
+              () -> testCompletedQuizzes(6, 2, 0, 3, quizIds[2]),
+              () -> testCompletedQuizzes(6, 2, 0, 2, quizIds[3]),
+              () -> testCompletedQuizzes(6, 2, 0, 1, quizIds[6]),
+              () -> testCompletedQuizzes(6, 2, 0, 0, quizIds[6]),
+      
+      
+              // Test pagination completed quizzes
+              () -> checkQuizSuccess(quizIds[4], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[4], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[4], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[4], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[4], "[]", true, 1),
+              () -> checkQuizSuccess(quizIds[6], "[0,1,3]", true, 1),
+      
+              () -> checkQuizSuccess(quizIds[3], "[1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[3], "[1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[3], "[1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[3], "[1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[3], "[1,3]", true, 2),
+              () -> checkQuizSuccess(quizIds[5], "[]", true, 2),
+      
+              () -> testCompletedQuizzes(10, 1, 0 ,0, quizIds[6]),
+              () -> testCompletedQuizzes(10, 1, 0 ,1, quizIds[4]),
+              () -> testCompletedQuizzes(10, 1, 0 ,2, quizIds[4]),
+              () -> testCompletedQuizzes(10, 1, 0 ,3, quizIds[4]),
+              () -> testCompletedQuizzes(10, 1, 0 ,4, quizIds[4]),
+              () -> testCompletedQuizzes(10, 1, 0 ,5, quizIds[4]),
+              () -> testCompletedQuizzes(1, 1, 1 ,0, quizIds[0]),
+      
+              () -> testCompletedQuizzes(10, 2, 0 ,0, quizIds[5]),
+              () -> testCompletedQuizzes(10, 2, 0 ,1, quizIds[3]),
+              () -> testCompletedQuizzes(10, 2, 0 ,2, quizIds[3]),
+              () -> testCompletedQuizzes(10, 2, 0 ,3, quizIds[3]),
+              () -> testCompletedQuizzes(10, 2, 0 ,4, quizIds[3]),
+              () -> testCompletedQuizzes(10, 2, 0 ,5, quizIds[3]),
+              () -> testCompletedQuizzes(2, 2, 1 ,1, quizIds[1]),
+              () -> testCompletedQuizzes(2, 2, 1 ,0, quizIds[0]),
+      
+      
+              // Test delete
+              () -> testDelete(quizIds[0], 1, 204),
+              () -> testDelete(quizIds[0], 1, 404),
+              () -> testQuizNotExists(0, 1, 0),
+              () -> testQuizNotExists(0, 2, 0),
+              () -> testQuizExists(1, 1),
+              () -> testQuizExists(1, 2),
+      
+              () -> testDelete(quizIds[1], 1, 403),
+              () -> testDelete(quizIds[1], 1, 403),
+              () -> testDelete(quizIds[1], 2, 204),
+              () -> testDelete(quizIds[1], 2, 404),
+              () -> testDelete(quizIds[1], 1, 404),
+              () -> testQuizNotExists(0, 1, 0),
+              () -> testQuizNotExists(0, 2, 0),
+              () -> testQuizNotExists(1, 1, 0),
+              () -> testQuizNotExists(1, 2, 0),
+      
+              () -> testAllQuizzes(5, 0,1),
+              () -> reloadServer(),
+              () -> testAllQuizzes(5, 0,2),
+              () -> testQuizNotExists(0, 1, 0),
+              () -> testQuizNotExists(0, 2, 0),
+              () -> testQuizNotExists(1, 1, 0),
+              () -> testQuizNotExists(1, 2, 0),
+      
+      
+              // Test pagination all quizzes
+              () -> testCreateQuiz(6, 1),
+              () -> testCreateQuiz(6, 2),
+              () -> testCreateQuiz(6, 1),
+              () -> testCreateQuiz(6, 1),
+              () -> testCreateQuiz(6, 1),
+              () -> testCreateQuiz(6, 2),
+              () -> testCreateQuiz(6, 1),
+              () -> testCreateQuiz(6, 2),
+              () -> testCreateQuiz(6, 1),
+              () -> testCreateQuiz(6, 2),
+              () -> testAllQuizzes(10, 0,1),
+              () -> testAllQuizzes(10, 0,2),
+              () -> testAllQuizzes(5, 1,1),
+              () -> testAllQuizzes(5, 1,2),
+          };
+      
+          private CheckResult testRegister(String login, String password, int status) {
+              JsonObject json = new JsonObject();
+              json.addProperty("email", login);
+              json.addProperty("password", password);
+      
+              String url = "/api/register";
+              HttpRequest req = post(url, getPrettyJson(json));
+              HttpResponse resp = req.send();
+      
+              checkStatusCode(resp, status);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testCreateQuizNoAuth(int quizNum) {
+              String url = "/api/quizzes";
+              HttpRequest req = post(url, quizzes[quizNum]);
+              HttpResponse resp = req.send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testCreateQuizFakeAuth(int quizNum) {
+              String url = "/api/quizzes";
+              HttpRequest req = post(url, quizzes[quizNum]);
+              HttpResponse resp = auth(req, 3).send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testSolveQuizNoAuth(int quizNum, String answerSent) {
+              String url = "/api/quizzes/" + quizNum + "/solve";
+              HttpRequest req = post(url, "{" + " \"answer\" : " + answerSent + "}");
+              HttpResponse resp = req.send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testSolveQuizFakeAuth(int quizNum, String answerSent) {
+              String url = "/api/quizzes/" + quizNum + "/solve";
+              HttpRequest req = post(url, "{" + " \"answer\" : " + answerSent + "}");
+              HttpResponse resp = auth(req, 3).send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testAllQuizzesNoAuth() {
+              String url = "/api/quizzes";
+              HttpResponse resp = get(url).send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testAllQuizzesFakeAuth() {
+              String url = "/api/quizzes";
+              HttpResponse resp = auth(get(url), 3).send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testDeleteQuizzesNoAuth(int quizNum) {
+              String url = "/api/quizzes/" + quizNum;
+              HttpRequest req = delete(url);
+              HttpResponse resp = req.send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testDeleteQuizzesFakeAuth(int quizNum) {
+              String url = "/api/quizzes/" + quizNum;
+              HttpRequest req = delete(url);
+              HttpResponse resp = auth(req, 3).send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testCompletedQuizzesNoAuth() {
+              String url = "/api/quizzes/completed";
+              HttpRequest req = get(url).addParam("page", "0");
+              HttpResponse resp = req.send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testCompletedQuizzesFakeAuth() {
+              String url = "/api/quizzes/completed";
+              HttpRequest req = get(url).addParam("page", "0");
+              HttpResponse resp = auth(req, 3).send();
+              checkStatusCode(resp, 401);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testCreateQuiz(int quizNum, int user) {
+              String url = "/api/quizzes";
+              HttpRequest req = post(url, quizzes[quizNum]);
+              HttpResponse resp = auth(req, user).send();
+              checkStatusCode(resp, 200);
+      
+              expect(resp.getContent()).asJson().check(
+                  isObject()
+                      .value("id", isInteger(i -> {
+                          quizIds[quizNum] = i;
+                          return true;
+                      }))
+                      .anyOtherValues()
+              );
+      
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testQuizExists(int quizNum, int user) {
+              int quizId = quizIds[quizNum];
+              String quiz = quizzes[quizNum];
+      
+              String url = "/api/quizzes/" + quizId;
+      
+              HttpResponse resp = auth(get(url), user).send();
+              checkStatusCode(resp, 200);
+      
+              JsonObject rightQuiz = getJson(quiz).getAsJsonObject();
+              rightQuiz.remove("answer");
+              rightQuiz.addProperty("id", quizId);
+      
+              expect(getPrettyJson(rightQuiz)).asJson().check(
+                  isObject()
+                      .value("id", quizId)
+                      .value("title", isString())
+                      .value("text", isString())
+                      .value("options", isArray(any()))
+              );
+      
+              JsonElement json = resp.getJson();
+      
+              CheckResult wrongResponse = CheckResult.wrong(
+                  "The quiz sent to the program looked like this:\n" +
+                      getPrettyJson(rightQuiz) + "\n\n" +
+                      "But the received quiz looks like that:\n" +
+                      getPrettyJson(json)
+              );
+      
+              if (!json.isJsonObject()) {
+                  return wrongResponse;
+              }
+      
+              JsonObject obj = json.getAsJsonObject();
+      
+              if (!rightQuiz.equals(obj)) {
+                  return wrongResponse;
+              }
+      
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testQuizNotExists(int quizNum, int user, int shift) {
+              int quizId = quizIds[quizNum];
+      
+              String url = "/api/quizzes/" + (quizId + shift);
+              HttpResponse resp = auth(get(url), user).send();
+              checkStatusCode(resp, 404);
+      
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testAllQuizzes(int count, int page, int user) {
+              String url = "/api/quizzes";
+              HttpRequest req = get(url).addParam("page", "" + page);
+              HttpResponse resp = auth(req, user).send();
+              checkStatusCode(resp, 200);
+      
+              expect(resp.getContent()).asJson().check(
+                  isObject()
+                      .value("content", isArray(count, isObject()
+                          .value("id", isInteger())
+                          .value("title", isString())
+                          .value("text", isString())
+                          .value("options", isArray(any()))
+                      ))
+                      .anyOtherValues()
+              );
+      
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testCompletedQuizzes(int count, int user, int page, int indexForCheckingQuizId, int quizNum) {
+              String url = "/api/quizzes/completed";
+              HttpRequest req = get(url).addParam("page", "" + page);
+              HttpResponse resp = auth(req, user).send();
+              checkStatusCode(resp, 200);
+      
+              expect(resp.getContent()).asJson().check(
+                  isObject()
+                      .value("content",
+                          isArray(count,
+                              isObject()
+                                  .value("id", isInteger())
+                                  .value("completedAt", isString()))
+      
+                              .item(indexForCheckingQuizId,
+                                  isObject()
+                                      .value("id", quizNum)
+                                      .value("completedAt", isString()))
+                      )
+                      .anyOtherValues()
+              );
+      
+              return CheckResult.correct();
+          }
+      
+          private CheckResult checkQuizSuccess(int quizNum, String answerSent, boolean shouldResponse, int user) {
+              String url = "/api/quizzes/" + quizNum + "/solve";
+      
+              HttpRequest req = post(url, "{" + " \"answer\" : " + answerSent + "}");
+              HttpResponse resp = auth(req, user).send();
+              checkStatusCode(resp, 200);
+      
+              expect(resp.getContent()).asJson().check(
+                  isObject()
+                      .value("success", shouldResponse)
+                      .value("feedback", isString())
+              );
+      
+              return CheckResult.correct();
+          }
+      
+          private CheckResult addIncorrectQuiz(String quiz, int user) {
+              String url = "/api/quizzes";
+              HttpRequest req = post(url, quiz);
+              HttpResponse resp = auth(req, user).send();
+              checkStatusCode(resp, 400);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult testDelete(int quizNum, int user, int status) {
+              String url = "/api/quizzes/" + quizNum;
+              HttpRequest req = delete(url);
+              HttpResponse resp = auth(req, user).send();
+              checkStatusCode(resp, status);
+              return CheckResult.correct();
+          }
+      
+          private CheckResult reloadServer() {
+              try {
+                  reloadSpring();
+              } catch (Exception ex) {
+                  throw new UnexpectedError(ex.getMessage(), ex);
+              }
+              return CheckResult.correct();
+          }
+      }
+    learner_created: false
+  - name: src/engine/repositories/QuizRepository.kt
+    visible: true
+    text: |-
+      package engine.repositories
+      
+      import engine.buisnesslayer.quizzes.Quizzes
+      import org.springframework.data.jpa.repository.JpaRepository
+      import org.springframework.data.repository.CrudRepository
+      
+      interface QuizRepository: JpaRepository<Quizzes, Long> {
+          fun findQuizById(id: Long): Quizzes
+      }
+    learner_created: true
+  - name: src/engine/repositories/AppUserRepository.kt
+    visible: true
+    text: |-
+      package engine.repositories
+      
+      import engine.buisnesslayer.users.AppUser
+      import org.springframework.data.repository.CrudRepository
+      import org.springframework.stereotype.Repository
+      
+      @Repository
+      interface AppUserRepository: CrudRepository<AppUser, Long> {
+          fun findAppUserByUsername(username: String?): AppUser?
+      
+          fun existsByUsername(username: String?): Boolean
+      }
+    learner_created: true
+  - name: src/engine/repositories/QuizzesCompletedRepository.kt
+    visible: true
+    learner_created: true
+  - name: src/engine/CustomException.kt
+    visible: true
+    text: |-
+      package engine.presentation
+      
+      import org.springframework.http.HttpStatus
+      import org.springframework.http.ResponseEntity
+      import org.springframework.web.bind.annotation.ControllerAdvice
+      import org.springframework.web.bind.annotation.ExceptionHandler
+      import org.springframework.web.bind.annotation.ResponseStatus
+      import org.springframework.web.context.request.WebRequest
+      import java.time.LocalDateTime
+      
+      class BadQuizException(message: String): RuntimeException(message)
+      class UserExistException(message: String): RuntimeException(message)
+      class QuizDeleted(message: String): RuntimeException(message)
+      class UserMatchException(message: String): RuntimeException(message)
+      
+      class CustomErrorMessage(
+          val statusCode:Int,
+          val timestamp: LocalDateTime,
+          val message: String?,
+          val description: String
+      )
+      
+      @ControllerAdvice
+      class ControllerExceptionHandler {
+          @ExceptionHandler(BadQuizException::class)
+          fun handleQuizNotFound(e: BadQuizException, request: WebRequest): ResponseEntity<CustomErrorMessage> {
+              val body = CustomErrorMessage(
+                  HttpStatus.NOT_FOUND.value(),
+                  LocalDateTime.now(),
+                  e.message,
+                  request.getDescription(false)
+              )
+              return ResponseEntity<CustomErrorMessage>(body, HttpStatus.NOT_FOUND)
+          }
+      
+          @ExceptionHandler(UserExistException::class)
+          fun userExist(e: UserExistException, request: WebRequest): ResponseEntity<CustomErrorMessage> {
+              val body = CustomErrorMessage(
+                  HttpStatus.BAD_REQUEST.value(),
+                  LocalDateTime.now(),
+                  e.message,
+                  request.getDescription(false)
+              )
+              return ResponseEntity<CustomErrorMessage>(body, HttpStatus.BAD_REQUEST)
+          }
+      
+          @ExceptionHandler(QuizDeleted::class)
+          fun quizDeleted(e: QuizDeleted, request: WebRequest): ResponseEntity<CustomErrorMessage> {
+              val body = CustomErrorMessage(
+                  HttpStatus.NO_CONTENT.value(),
+                  LocalDateTime.now(),
+                  e.message,
+                  request.getDescription(false)
+              )
+              return ResponseEntity<CustomErrorMessage>(body, HttpStatus.NO_CONTENT)
+          }
+      
+          @ExceptionHandler(UserMatchException::class)
+          fun userNotMatch(e: UserMatchException, request: WebRequest): ResponseEntity<CustomErrorMessage> {
+              val body = CustomErrorMessage(
+                  HttpStatus.FORBIDDEN.value(),
+                  LocalDateTime.now(),
+                  e.message,
+                  request.getDescription(false)
+              )
+              return ResponseEntity<CustomErrorMessage>(body, HttpStatus.FORBIDDEN)
+          }
+      }
+    learner_created: true
+  - name: src/engine/model/AnswerResponse.kt
+    visible: true
+    text: |-
+      package engine.buisnesslayer.responses
+      
+      class AnswerResponse(
+          val success: Boolean,
+          val feedback: String
+      )
+    learner_created: true
+  - name: src/engine/model/AppUser.kt
+    visible: true
+    text: |-
+      package engine.buisnesslayer.users
+      
+      import jakarta.persistence.Entity
+      import jakarta.persistence.GeneratedValue
+      import jakarta.persistence.Id
+      import jakarta.persistence.Table
+      
+      @Entity
+      @Table(name = "appUsers")
+      class AppUser (
+          @Id
+          @GeneratedValue
+          var id: Long? = null,
+      
+          var username: String? = null,
+      
+          var password: String? = null,
+          var authority: String? = null,
+      
+      )
+    learner_created: true
+  - name: src/engine/model/Answer.kt
+    visible: true
+    text: |
+      package engine.buisnesslayer
+      
+      class Answer(
+          val answer: List<Int>
+      )
+    learner_created: true
+  - name: src/engine/model/Quizzes.kt
+    visible: true
+    text: |-
+      package engine.buisnesslayer.quizzes
+      
+      import engine.buisnesslayer.responses.QuizzesResponse
+      import jakarta.persistence.*
+      import jakarta.validation.constraints.NotBlank
+      import jakarta.validation.constraints.Size
+      import org.jetbrains.annotations.NotNull
+      
+      @Entity
+      @Table(name = "quizzes")
+      class Quizzes(
+          @Id
+          @GeneratedValue(strategy = GenerationType.SEQUENCE)
+          @Column
+          var id: Long,
+      
+          @field:NotNull
+          @field:NotBlank
+          @Column
+          val title: String = "",
+      
+          @field:NotNull
+          @field:NotBlank
+          @Column
+          val text: String = "",
+      
+          @field:Size(min = 2)
+          @Column
+          val options: List<String> = listOf(),
+      
+          @Column
+          val answer: List<Int>? = listOf(),
+      
+          @Column
+          var ownerName: String? = null
+      ) {
+          fun toResponse(): QuizzesResponse{
+              return QuizzesResponse(id, title, text, options)
+          }
+      }
+    learner_created: true
+  - name: src/engine/model/QuizzesCompleted.kt
+    visible: true
+    learner_created: true
+  - name: src/engine/security/SecurityConfig.kt
+    visible: true
+    text: |+
+      package engine.presentation
+      
+      import AppUserDetailsImpl
+      import org.springframework.boot.autoconfigure.security.servlet.PathRequest
+      import org.springframework.context.annotation.Bean
+      import org.springframework.context.annotation.Configuration
+      import org.springframework.http.HttpMethod
+      import org.springframework.security.authentication.AuthenticationProvider
+      import org.springframework.security.authentication.dao.DaoAuthenticationProvider
+      import org.springframework.security.config.Customizer
+      import org.springframework.security.config.annotation.web.builders.HttpSecurity
+      import org.springframework.security.core.userdetails.UserDetailsService
+      import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+      import org.springframework.security.crypto.password.PasswordEncoder
+      import org.springframework.security.web.SecurityFilterChain
+      
+      
+      @Configuration
+      class SecurityConfig {
+      
+          @Bean
+          fun userDetailsService(): UserDetailsService {
+              return AppUserDetailsImpl()
+          }
+      
+          @Bean
+          fun authenticationProvider(): AuthenticationProvider {
+              val provider = DaoAuthenticationProvider()
+              provider.setUserDetailsService(userDetailsService())
+              provider.setPasswordEncoder(passwordEncoder())
+              return provider
+          }
+      
+          @Bean
+          @Throws(Exception::class)
+          fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+              http
+                  .authorizeHttpRequests { matcherRegistry ->
+                      matcherRegistry
+                          .requestMatchers(HttpMethod.GET, "/api/quizzes").hasRole("USER")
+                          .requestMatchers(HttpMethod.POST,"/api/quizzes").hasRole("USER")
+                          .requestMatchers(HttpMethod.POST,"/api/quizzes/**").hasRole("USER")
+                          .requestMatchers(HttpMethod.DELETE,"/api/quizzes/**").hasRole("USER")
+                          .requestMatchers(HttpMethod.POST, "/actuator/shutdown").permitAll()
+                          .requestMatchers(HttpMethod.POST, "/api/register").permitAll()
+                          .requestMatchers(HttpMethod.POST, "/api/**").permitAll()
+                          .requestMatchers(PathRequest.toH2Console()).permitAll()
+                          .anyRequest().permitAll()
+                  }
+                  .httpBasic(Customizer.withDefaults())
+                  .csrf().disable()
+                  .cors().disable()
+                  .formLogin(Customizer.withDefaults())
+                  .headers().frameOptions().disable()
+      
+              return http.build()
+          }
+      
+          @Bean
+          fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
+      }
+    
+    learner_created: true
+  - name: src/engine/service/QuizzesCompletedService.kt
+    visible: true
+    learner_created: true
+  - name: src/engine/service/QuizService.kt
+    visible: true
+    text: |-
+      package engine.buisnesslayer
+      
+      import engine.buisnesslayer.quizzes.Quizzes
+      import engine.repositories.QuizRepository
+      import org.springframework.context.annotation.Configuration
+      import org.springframework.data.domain.PageRequest
+      
+      @Configuration
+      class QuizService(private val quizRepository: QuizRepository) {
+          fun findQuizById(id: Long): Quizzes {
+              return quizRepository.findQuizById(id)
+          }
+      
+          fun saveQuiz(toSave: Quizzes, user: String): Quizzes {
+              toSave.ownerName = user
+              return quizRepository.save(toSave)
+          }
+      
+          fun existById(id: Long): Boolean {
+              return quizRepository.existsById(id)
+          }
+      
+          fun findAll(pageable: PageRequest): MutableIterable<Quizzes> {
+              return quizRepository.findAll()
+          }
+      
+          fun deleteById(id: Long) {
+              quizRepository.deleteById(id)
+          }
+      }
+    learner_created: true
+  - name: src/engine/controllers/Controller.kt
+    visible: true
+    text: |
+      package engine.presentation
+      
+      
+      import engine.buisnesslayer.*
+      import engine.buisnesslayer.quizzes.Quizzes
+      import engine.buisnesslayer.responses.AnswerResponse
+      import engine.buisnesslayer.responses.QuizzesResponse
+      import engine.buisnesslayer.users.AppUser
+      import engine.repositories.AppUserRepository
+      import jakarta.validation.Valid
+      import org.springframework.data.domain.PageRequest
+      import org.springframework.security.access.prepost.PreAuthorize
+      import org.springframework.security.core.annotation.AuthenticationPrincipal
+      import org.springframework.security.core.userdetails.UserDetails
+      import org.springframework.security.crypto.password.PasswordEncoder
+      import org.springframework.web.bind.annotation.*
+      
+      @RestController
+      class Controller(private val quizService: QuizService, private val repository: AppUserRepository) {
+          @PostMapping("/api/quizzes")
+          @PreAuthorize("hasAuthority('ROLE_USER')")
+          fun saveQuiz(@RequestBody @Valid quiz: Quizzes, @AuthenticationPrincipal user: UserDetails): QuizzesResponse {
+              quizService.saveQuiz(quiz, user.username)
+      
+              return quiz.toResponse()
+          }
+      
+          @PostMapping("/api/quizzes/{id}/solve")
+          @PreAuthorize("hasAuthority('ROLE_USER')")
+          fun postAnswer(@PathVariable id:Long, @RequestBody answer: Answer): AnswerResponse {
+              if (quizService.existById(id)){
+                  return if (quizService.findQuizById(id).answer == answer.answer) AnswerResponse(true,"Congratulations, you're right!")
+                  else AnswerResponse(false, "Wrong answer! Please, try again.")
+              }
+      
+              throw BadQuizException("Quiz with id = $id not found")
+          }
+      
+          @GetMapping("/api/quizzes")
+          @PreAuthorize("hasAuthority('ROLE_USER')")
+          fun getAllQuizzes(@RequestParam page: Int): MutableList<QuizzesResponse>{
+              val pageable = PageRequest.of(page,10)
+              return quizService.findAll(pageable).map { it.toResponse() }.toMutableList()
+          }
+      
+          @GetMapping("/api/quizzes/{id}")
+          fun getQuiz(@PathVariable id: Long): QuizzesResponse {
+              if (quizService.existById(id)) return quizService.findQuizById(id).toResponse()
+              throw BadQuizException("Quiz with id = $id not found")
+          }
+      
+          @DeleteMapping("/api/quizzes/{id}")
+          @PreAuthorize("hasAuthority('ROLE_USER')")
+          fun deleteQuiz(@PathVariable id: Long, @AuthenticationPrincipal user: UserDetails) {
+              if (quizService.existById(id)) {
+                  if (quizService.findQuizById(id).ownerName == user.username) {
+                      quizService.deleteById(id)
+                      throw QuizDeleted("Quiz $id has been deleted")
+                  }
+                  throw UserMatchException("Its not u quiz")
+              }
+              throw BadQuizException("Quiz with id = $id not found")
+          }
+      }
+      
+      
+      @RestController
+      class AppUserController(
+          private val repository: AppUserRepository,
+          private val passwordEncoder: PasswordEncoder
+      ) {
+      
+          @PostMapping("/api/register")
+          fun regUser(@RequestBody @Valid request: RegistrationRequest):String {
+              if (request.password.length < 5 ) throw UserExistException("Password length must be more than 5 char")
+              if (!request.email.contains('@') || !request.email.contains('.')) throw UserExistException("Wrong email")
+              if (repository.existsByUsername(request.email)) throw UserExistException("User ${request.email} already registered")
+              val user = AppUser()
+              user.username = request.email
+              user.password = passwordEncoder.encode(request.password)
+              user.authority = "ROLE_USER"
+              repository.save(user)
+      
+              return "User ${request.email}, ${request.password} registered"
+          }
+      
+          data class RegistrationRequest(val email: String, val password: String,)
+      }
+    learner_created: true
+  - name: src/engine/security/AppUserAdapter.kt
+    visible: true
+    text: |-
+      package engine.buisnesslayer.users
+      
+      import org.springframework.security.core.GrantedAuthority
+      import org.springframework.security.core.authority.SimpleGrantedAuthority
+      import org.springframework.security.core.userdetails.User
+      import org.springframework.security.core.userdetails.UserDetails
+      
+      class AppUserAdapter(private val user: AppUser): UserDetails {
+          val grantedAuthority: GrantedAuthority = SimpleGrantedAuthority("ROLE_USER")
+      
+          override fun getAuthorities(): Collection<GrantedAuthority> {
+              return listOf(SimpleGrantedAuthority(user.authority))
+          }
+          override fun getPassword(): String = requireNotNull(user.password)
+      
+          override fun getUsername(): String = requireNotNull(user.username)
+      
+          override fun isAccountNonExpired(): Boolean = true
+      
+          override fun isAccountNonLocked(): Boolean = true
+      
+          override fun isCredentialsNonExpired(): Boolean = true
+      
+          override fun isEnabled(): Boolean = true
+      
+      }
+    learner_created: true
+  - name: src/engine/security/AppUserDetailsImpl.kt
+    visible: true
+    text: |+
+      import engine.buisnesslayer.users.AppUserAdapter
+      import engine.repositories.AppUserRepository
+      import org.springframework.beans.factory.annotation.Autowired
+      import org.springframework.security.core.userdetails.UserDetails
+      import org.springframework.security.core.userdetails.UserDetailsService
+      import org.springframework.security.core.userdetails.UsernameNotFoundException
+      import org.springframework.stereotype.Service
+      import java.util.*
+      
+      @Service
+      class AppUserDetailsImpl() : UserDetailsService {
+          @Autowired
+          private val repository: AppUserRepository? = null
+      
+          @Throws(UsernameNotFoundException::class)
+          override fun loadUserByUsername(username: String): UserDetails {
+              val user = repository?.findAppUserByUsername(username)
+                  ?: throw UsernameNotFoundException("Not found")
+      
+              return AppUserAdapter(user)
+          }
+      }
+    
+    
+    learner_created: true
+  - name: src/engine/service/AppUserService.kt
+    visible: true
+    learner_created: true
+feedback_link: https://hyperskill.org/learn/step/24910#comment
+status: Solved
+feedback:
+  message: Well done! You've finished the project. Select a new project on <a href="https://hyperskill.org/projects">Hyperskill</a>
+    to continue learning.
+  time: "Fri, 12 Apr 2024 21:02:02 UTC"
+record: 6

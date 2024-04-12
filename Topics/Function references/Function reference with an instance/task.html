@@ -1,0 +1,14 @@
+<h2>Function reference with an instance</h2>
+<div class="step-text">
+<p></p><p>Given the following class with a few functions:</p><pre><code class="language-kotlin">class Customer(val firstName: String, val lastName: String) {
+    fun receiveFirstName():String {
+        return firstName
+    }
+
+    fun receiveLastName():String {
+        return lastName
+    }
+} 
+</code></pre><p>Here is one instance of the class:</p><pre><code class="language-kotlin">val customer: Customer = Customer("Paul", "Morris")
+</code></pre><p>How can you write a function reference to the function <code class="language-kotlin">receiveFirstName()</code> using this instance?</p><p>Do not add whitespaces to your result.</p>
+</div>
